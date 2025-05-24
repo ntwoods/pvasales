@@ -1,0 +1,427 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sales Dashboard</title>
+    <link rel="stylesheet" href="styles.css">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
+</head>
+<style>
+.gradient-bg {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+}
+
+.card-shadow {
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+}
+
+/* Loading spinner */
+.loading-spinner {
+    border: 3px solid #f3f3f3;
+    border-top: 3px solid #667eea;
+    border-radius: 50%;
+    width: 30px;
+    height: 30px;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+/* Toggle buttons */
+.toggle-container {
+    background: linear-gradient(135deg, #f0f2f5 0%, #e8ebf0 100%);
+    padding: 4px;
+    border-radius: 16px;
+    display: flex;
+    position: relative;
+    box-shadow: inset 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.toggle-option {
+    flex: 1;
+    padding: 12px 24px;
+    border-radius: 12px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.3s cubic-bezier(0.4, 0.0, 0.2, 1);
+    font-weight: 600;
+    font-size: 14px;
+    position: relative;
+    z-index: 2;
+}
+
+.toggle-option.active {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+    transform: translateY(-1px);
+}
+
+.toggle-option:not(.active) {
+    color: #6b7280;
+}
+
+.toggle-option:not(.active):hover {
+    color: #374151;
+    background: rgba(255, 255, 255, 0.7);
+}
+
+/* Filter dropdowns */
+.filter-select {
+    width: 100%;
+    padding: 8px 12px;
+    border: 1px solid #ccc;
+    border-radius: 8px;
+    font-size: 14px;
+}
+
+/* Performance section transitions */
+.content-section {
+    opacity: 0;
+    transform: translateY(20px);
+    transition: all 0.4s ease;
+    display: none;
+}
+
+.content-section.active {
+    opacity: 1;
+    transform: translateY(0);
+    display: block;
+}
+
+/* Progress bar container */
+.progress-container {
+    background: #e2e8f0;
+    border-radius: 12px;
+    height: 8px;
+    overflow: hidden;
+    position: relative;
+}
+
+.progress-fill {
+    height: 100%;
+    border-radius: 12px;
+    transition: width 1s ease-in-out;
+    position: relative;
+    background: linear-gradient(135deg, #3b82f6 0%, #10b981 100%);
+}
+
+.progress-fill::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: linear-gradient(45deg, transparent 30%, rgba(255,255,255,0.3) 50%, transparent 70%);
+    animation: shimmer 2s infinite;
+}
+
+@keyframes shimmer {
+    0% { transform: translateX(-100%); }
+    100% { transform: translateX(100%); }
+}
+
+/* Achievement badge styles */
+.achievement-badge {
+    padding: 6px 12px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 700;
+    text-align: center;
+    min-width: 60px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+.achievement-excellent {
+    background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+    color: white;
+}
+
+.achievement-good {
+    background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+    color: white;
+}
+
+.achievement-needs-improvement {
+    background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+    color: white;
+}
+
+/* Tags for products */
+.product-tag {
+    display: inline-block;
+    padding: 4px 8px;
+    margin: 2px;
+    background: linear-gradient(135deg, #e0e7ff 0%, #c7d2fe 100%);
+    color: #3730a3;
+    border-radius: 8px;
+    font-size: 11px;
+    font-weight: 600;
+}
+
+/* Responsive tweaks */
+@media (max-width: 768px) {
+    .filter-select {
+        font-size: 13px;
+    }
+
+    .product-tag {
+        font-size: 10px;
+        padding: 2px 6px;
+    }
+}
+</style>
+<body class="bg-gray-50 min-h-screen">
+    <header class="gradient-bg text-white py-6 px-4 shadow-lg">
+        <div class="container mx-auto text-center">
+            <h1 class="text-3xl font-bold">Sales Performance Dashboard</h1>
+            <p class="mt-2 opacity-90" id="agentName">Loading...</p>
+        </div>
+    </header>
+
+    <main id="mainContent" class="hidden container mx-auto px-4 py-8">
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8" id="summaryCards"></div>
+
+        <div class="bg-white rounded-xl p-6 card-shadow mb-8">
+            <h3 class="text-lg font-semibold text-gray-900 mb-4">Filters</h3>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <select id="productFilter" class="filter-select">
+                    <option value="">All Products</option>
+                </select>
+                <select id="partyFilter" class="filter-select">
+                    <option value="">All Parties</option>
+                </select>
+                <select id="monthFilter" class="filter-select">
+                    <option value="">All Months</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="mb-8 toggle-container">
+            <div class="toggle-option active" id="productToggle" onclick="switchView('product')">📊 By Product</div>
+            <div class="toggle-option" id="partyToggle" onclick="switchView('party')">🏢 By Party</div>
+        </div>
+
+        <section id="productPerformance" class="content-section active mb-8">
+            <h3 class="text-xl font-semibold text-gray-900 mb-4">Sales Performance by Product</h3>
+            <div id="salesCards" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"></div>
+        </section>
+
+        <section id="partyPerformance" class="content-section mb-8 hidden">
+            <h3 class="text-xl font-semibold text-gray-900 mb-4">Sales Performance by Party</h3>
+            <div id="partyGroups" class="space-y-8"></div>
+        </section>
+    </main>
+
+    <div id="loadingState" class="flex justify-center items-center py-20">
+        <div class="text-center">
+            <div class="loading-spinner mx-auto mb-4"></div>
+            <p class="text-gray-600">Loading sales data...</p>
+        </div>
+    </div>
+
+    <div id="errorState" class="hidden container mx-auto px-4 py-10">
+        <div class="bg-red-50 border border-red-200 rounded-lg p-6 text-center">
+            <div class="text-red-500 text-5xl mb-4">⚠️</div>
+            <h3 class="text-lg font-semibold text-red-800 mb-2">Failed to Load Data</h3>
+            <p class="text-red-600 mb-4">Unable to fetch sales data. Please try again.</p>
+            <button onclick="fetchData()" class="bg-red-500 hover:bg-red-600 text-white px-6 py-2 rounded-lg">Retry</button>
+        </div>
+    </div>
+<script>
+let salesData = [];
+let filteredData = [];
+let currentView = 'product';
+
+const API_URL = 'https://script.google.com/macros/s/AKfycbxKo61yk5-huRT0LLFrWhTF-J8aZx8DZ2kzmWC_PAl7th9_P6-CksyUgLsOBrV0FNhQGw/exec';
+const AGENT_NAME = 'Mr.%20Shyam%20Upadhyay';
+
+document.getElementById('productFilter').addEventListener('change', applyFilters);
+document.getElementById('partyFilter').addEventListener('change', applyFilters);
+document.getElementById('monthFilter').addEventListener('change', applyFilters);
+
+function switchView(view) {
+    currentView = view;
+    document.getElementById('productToggle').classList.toggle('active', view === 'product');
+    document.getElementById('partyToggle').classList.toggle('active', view === 'party');
+    document.getElementById('productPerformance').classList.toggle('active', view === 'product');
+    document.getElementById('partyPerformance').classList.toggle('active', view === 'party');
+}
+
+async function fetchData() {
+    try {
+        toggleVisibility('loading');
+        const response = await fetch(`${API_URL}?Agent=${AGENT_NAME}`);
+        const data = await response.json();
+        if (data.success) {
+            salesData = data.data;
+            filteredData = [...salesData];
+            document.getElementById('agentName').textContent = data.agent;
+            populateFilters();
+            updateSummaryCards();
+            renderSalesCards();
+            renderPartyGroups();
+            toggleVisibility('main');
+        } else {
+            toggleVisibility('error');
+        }
+    } catch (error) {
+        console.error('Error fetching data:', error);
+        toggleVisibility('error');
+    }
+}
+
+function toggleVisibility(state) {
+    document.getElementById('loadingState').classList.add('hidden');
+    document.getElementById('mainContent').classList.add('hidden');
+    document.getElementById('errorState').classList.add('hidden');
+    if (state === 'loading') document.getElementById('loadingState').classList.remove('hidden');
+    if (state === 'main') document.getElementById('mainContent').classList.remove('hidden');
+    if (state === 'error') document.getElementById('errorState').classList.remove('hidden');
+}
+
+function populateFilters() {
+    populateSelect('productFilter', [...new Set(salesData.map(i => i.product))]);
+    populateSelect('partyFilter', [...new Set(salesData.map(i => i.party))]);
+    populateSelect('monthFilter', [...new Set(salesData.map(i => i.month))]);
+}
+
+function populateSelect(id, options) {
+    const select = document.getElementById(id);
+    const preserved = select.value;
+    select.innerHTML = '<option value="">All</option>';
+    options.forEach(opt => {
+        const el = document.createElement('option');
+        el.value = opt;
+        el.textContent = id === 'monthFilter' ? formatMonth(opt) : opt;
+        select.appendChild(el);
+    });
+    select.value = preserved;
+}
+
+function formatMonth(month) {
+    if (!month) return month;
+    if (month.includes('-') && isNaN(month.split('-')[0])) return month.replace('-', ' ');
+    const parts = month.split('-');
+    const monthNames = ["January","February","March","April","May","June","July","August","September","October","November","December"];
+    return `${monthNames[parseInt(parts[1]) - 1]} ${parts[2]}`;
+}
+
+function applyFilters() {
+    const prod = document.getElementById('productFilter').value;
+    const party = document.getElementById('partyFilter').value;
+    const month = document.getElementById('monthFilter').value;
+    filteredData = salesData.filter(d =>
+        (!prod || d.product === prod) &&
+        (!party || d.party === party) &&
+        (!month || d.month === month)
+    );
+    updateSummaryCards();
+    renderSalesCards();
+    renderPartyGroups();
+}
+
+function updateSummaryCards() {
+    const totalProjected = filteredData.reduce((a, b) => a + b.projectedSale, 0);
+    const totalActual = filteredData.reduce((a, b) => a + b.actualSale, 0);
+    const percent = totalProjected ? ((totalActual / totalProjected) * 100).toFixed(1) : 'N/A';
+    document.getElementById('summaryCards').innerHTML = `
+        <div class="metric-card bg-white rounded-xl p-6 card-shadow">
+            <p class="text-sm text-gray-500">Total Records</p>
+            <p class="text-2xl font-bold text-gray-900">${filteredData.length}</p>
+        </div>
+        <div class="metric-card bg-white rounded-xl p-6 card-shadow">
+            <p class="text-sm text-gray-500">Total Projected</p>
+            <p class="text-2xl font-bold text-blue-600">${totalProjected.toLocaleString()}</p>
+        </div>
+        <div class="metric-card bg-white rounded-xl p-6 card-shadow">
+            <p class="text-sm text-gray-500">Total Actual</p>
+            <p class="text-2xl font-bold text-green-600">${totalActual.toLocaleString()}</p>
+        </div>
+        <div class="metric-card bg-white rounded-xl p-6 card-shadow">
+            <p class="text-sm text-gray-500">Achievement %</p>
+            <p class="text-2xl font-bold text-purple-600">${percent}%</p>
+        </div>`;
+}
+
+function renderSalesCards() {
+    const container = document.getElementById('salesCards');
+    container.innerHTML = '';
+    const grouped = {};
+    filteredData.forEach(i => (grouped[i.product] = grouped[i.product] || []).push(i));
+
+    for (const [product, items] of Object.entries(grouped)) {
+        const projected = items.reduce((sum, i) => sum + i.projectedSale, 0);
+        const actual = items.reduce((sum, i) => sum + i.actualSale, 0);
+        const achievement = projected ? (actual / projected * 100).toFixed(1) : 0;
+        const card = document.createElement('div');
+        card.className = 'bg-white rounded-xl p-6 card-shadow';
+        card.innerHTML = `
+            <div class="mb-4">
+                <h4 class="text-lg font-semibold text-gray-900 mb-2">${product}</h4>
+                <div class="text-sm text-gray-500">${items.length} record(s)</div>
+                <div class="mt-2 flex justify-between text-sm">
+                    <span class="text-blue-600">Projected: ${projected.toLocaleString()}</span>
+                    <span class="text-green-600">Actual: ${actual.toLocaleString()}</span>
+                </div>
+                <div class="w-full bg-gray-200 rounded-full h-3 mt-3">
+                    <div class="progress-fill" style="width: ${Math.min(achievement, 100)}%"></div>
+                </div>
+                <div class="text-sm text-center mt-1">${achievement}% Achievement</div>
+            </div>`;
+        container.appendChild(card);
+    }
+}
+
+function renderPartyGroups() {
+    const container = document.getElementById('partyGroups');
+    container.innerHTML = '';
+    const grouped = {};
+    filteredData.forEach(i => (grouped[i.party] = grouped[i.party] || []).push(i));
+
+    for (const [party, items] of Object.entries(grouped)) {
+        const wrapper = document.createElement('div');
+        wrapper.className = 'bg-white rounded-xl p-6 card-shadow';
+        wrapper.innerHTML = `<h4 class="text-lg font-bold mb-4">${party}</h4>`;
+
+        const productMap = {};
+        items.forEach(i => (productMap[i.product] = productMap[i.product] || []).push(i));
+
+        for (const [product, entries] of Object.entries(productMap)) {
+            const proj = entries.reduce((sum, i) => sum + i.projectedSale, 0);
+            const act = entries.reduce((sum, i) => sum + i.actualSale, 0);
+            const ach = proj ? (act / proj * 100).toFixed(1) : 0;
+            const block = document.createElement('div');
+            block.className = 'mb-4 border-t pt-4';
+            block.innerHTML = `
+                <div class="flex justify-between">
+                    <span class="font-semibold">${product}</span>
+                    <span class="text-sm text-gray-500">${entries.length} record(s)</span>
+                </div>
+                <div class="mt-1 flex justify-between text-sm">
+                    <span class="text-blue-600">Projected: ${proj.toLocaleString()}</span>
+                    <span class="text-green-600">Actual: ${act.toLocaleString()}</span>
+                </div>
+                <div class="w-full bg-gray-200 rounded-full h-3 mt-2">
+                    <div class="progress-fill" style="width: ${Math.min(ach, 100)}%"></div>
+                </div>
+                <div class="text-xs text-center mt-1">${ach}% Achievement</div>`;
+            wrapper.appendChild(block);
+        }
+        container.appendChild(wrapper);
+    }
+}
+
+fetchData();
+</script>
+
+
+
+</body>
+</html>
